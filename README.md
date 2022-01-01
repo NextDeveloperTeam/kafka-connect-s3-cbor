@@ -31,3 +31,45 @@ Then use this config:
   ...
 }
 ```
+
+### CBOR format
+
+The emitted CBOR records are key-value pairs of this JSON-style form:
+
+```json
+{
+  "key": <KEY_BYTES>,
+  "headers": [
+    {
+      "key": "HEADER_KEY_1_STRING",
+      "value": <HEADER_VALUE_1_BYTES>
+    },
+    ...
+  ],
+  "value": <VALUE_BYTES>,
+  "partition": <PARTITION_#_INT>,
+  "timestamp": <TIMESTAMP_LONG>,
+  "offset": <OFFSET_LONG>
+}
+```
+
+Approximate Python Sample Code
+
+```python
+gzip_stream = s3.get_object(Bucket="<BUCKET>", Key=row[0])['Body'].read()
+
+decoder = CBORDecoder(gzip.GzipFile(fileobj=io.BytesIO(gzip_stream)))
+
+while True:
+    try:
+        record = decoder.decode()
+    except EOFError:
+        return
+
+    producer.produce(topic,
+                     value=record['value'],
+                     key=record['key'],
+                     headers=[(x['key'], x['value']) for x in record['headers']],
+                     partition=record['partition'],
+                     timestamp=record['timestamp'])
+```
