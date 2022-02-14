@@ -71,17 +71,25 @@ public class CborRecordWriterProvider extends RecordViewSetter
         public void write(SinkRecord record) {
           log.trace("Sink record with view {}: {}", recordView, record);
 
+          String topic = record.topic();
+          long offset = record.kafkaOffset();
+          int partition = record.kafkaPartition();
+
           try {
-            writer.writeObject(new CborRecord(
+            CborRecord cborRecord = new CborRecord(
                 record.key(),
                 record.headers(),
                 record.value(),
-                record.topic(),
-                record.kafkaOffset(),
-                record.kafkaPartition(),
+                topic,
+                offset,
+                partition,
                 record.timestamp()
-            ));
-          } catch (IOException e) {
+            );
+
+            writer.writeObject(cborRecord);
+          } catch (Exception e) {
+            log.error("Failed to process record for topic: {}, partition: {}, offset: {}.",
+                topic, partition, offset);
             throw new ConnectException(e);
           }
         }
@@ -120,7 +128,7 @@ public class CborRecordWriterProvider extends RecordViewSetter
     private final String topic;
     private final long offset;
     private final int partition;
-    private final long timestamp;
+    private final Long timestamp;
 
     CborRecord(Object key,
                Headers headers,
@@ -128,7 +136,7 @@ public class CborRecordWriterProvider extends RecordViewSetter
                String topic,
                long offset,
                int partition,
-               long timestamp) {
+               Long timestamp) {
       this.key = key;
       this.headers = Streams.stream(headers)
           .map(h -> new HeaderSlim(h.key(), h.value()))
@@ -164,7 +172,7 @@ public class CborRecordWriterProvider extends RecordViewSetter
       return partition;
     }
 
-    public long getTimestamp() {
+    public Long getTimestamp() {
       return timestamp;
     }
   }
